@@ -85,6 +85,8 @@ module Asciidoctor
       EmDash = ?\u2014
       RightPointer = ?\u25ba
       LowercaseGreekA = ?\u03b1
+      UppercaseCyrillicA = ?\u0410
+      LowercaseCyrillicA = ?\u0430
       Bullets = {
         disc: ?\u2022,
         circle: ?\u25e6,
@@ -1589,7 +1591,13 @@ module Asciidoctor
           list_numeral = 1
         when 'loweralpha'
           list_numeral = 'a'
+          list_numeral = LowercaseCyrillicA if (node.document.attr 'lang') == 'ru'
         when 'upperalpha'
+          list_numeral = 'A'
+          list_numeral = UppercaseCyrillicA if (node.document.attr 'lang') == 'ru'
+        when 'lowerlatin'
+          list_numeral = 'a'
+        when 'upperlatin'
           list_numeral = 'A'
         when 'lowerroman'
           list_numeral = RomanNumeral.new 'i', :lower
@@ -1597,6 +1605,10 @@ module Asciidoctor
           list_numeral = RomanNumeral.new 'I', :upper
         when 'lowergreek'
           list_numeral = LowercaseGreekA
+        when 'lowercyrillic'
+          list_numeral = LowercaseCyrillicA
+        when 'uppercyrillic'
+          list_numeral = UppercaseCyrillicA
         when 'unstyled', 'unnumbered', 'no-bullet'
           list_numeral = nil
         when 'none'
