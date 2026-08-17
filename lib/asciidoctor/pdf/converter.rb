@@ -1726,7 +1726,8 @@ module Asciidoctor
             if index == ''
               marker = ''
             else
-              marker = node.parent.style == 'decimal' && index.abs < 10 ? %(#{index < 0 ? '-' : ''}0#{index.abs}.) : %(#{index}.)
+              separator = @theme.list_marker_separator || '.'
+              marker = node.parent.style == 'decimal' && index.abs < 10 ? %(#{index < 0 ? '-' : ''}0#{index.abs}#{separator}) : %(#{index}#{separator})
               dir = (node.parent.option? 'reversed') ? :pred : :next
               @list_numerals << (index.public_send dir)
               [:font_color, :font_family, :font_size, :font_style, :line_height].each do |prop|
