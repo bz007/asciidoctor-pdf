@@ -302,7 +302,7 @@ describe 'Asciidoctor::PDF::Converter - List' do
         (expect pdf.lines).to eql [%(\uf192 bullseye!)]
         marker_text = pdf.find_unique_text ?\uf192
         (expect marker_text).not_to be_nil
-        (expect marker_text[:font_name]).to eql 'FontAwesome5Free-Regular'
+        (expect marker_text[:font_name]).to eql 'FontAwesome6Free-Regular'
       end
     end
 
@@ -541,10 +541,10 @@ describe 'Asciidoctor::PDF::Converter - List' do
         (expect pdf.lines).to eql [%(\uf096 todo), %(\uf046 done)]
         unchecked_marker_text = pdf.find_unique_text ?\uf096
         (expect unchecked_marker_text).not_to be_nil
-        (expect unchecked_marker_text[:font_name]).to eql 'FontAwesome5Free-Solid'
+        (expect unchecked_marker_text[:font_name]).to eql 'FontAwesome6Free-Solid'
         checked_marker_text = pdf.find_unique_text ?\uf046
         (expect checked_marker_text).not_to be_nil
-        (expect checked_marker_text[:font_name]).to eql 'FontAwesome5Free-Solid'
+        (expect checked_marker_text[:font_name]).to eql 'FontAwesome6Free-Solid'
       end
     end
   end
@@ -2168,9 +2168,9 @@ describe 'Asciidoctor::PDF::Converter - List' do
       pdf = to_pdf <<~'END', pdf_theme: { conum_glyphs: '\u2776' }, analyze: true
       ....
       the one and only line <1>
-      no conum here <2>
+      unsupported conum here <2>
       ....
-      <1> That's all we have time for
+      <1> This conum is supported
       <2> This conum is not supported
       END
 
@@ -2181,8 +2181,13 @@ describe 'Asciidoctor::PDF::Converter - List' do
         (expect text[:font_color]).to eql 'B12146'
       end
 
-      lines_without_conum = pdf.lines.reject {|l| l.include? ?\u2776 }
-      (expect lines_without_conum).to eql ['no conum here', 'This conum is not supported']
+      expected_lines = [
+        %(the one and only line \u2776),
+        'unsupported conum here (2)',
+        %(\u2776 This conum is supported),
+        '(2) This conum is not supported',
+      ]
+      (expect pdf.lines).to eql expected_lines
     end
 
     it 'should keep list marker with primary text' do
@@ -2223,6 +2228,21 @@ describe 'Asciidoctor::PDF::Converter - List' do
       <1> #{lorem_ipsum '2-sentences-1-paragraph'}
       END
       (expect to_file).to visually_match 'colist-text-align-left.pdf'
+    end
+
+    it 'should default to number in brackets of conum glyph cannot be resolved' do
+      source_lines = (1..21).map {|n| %(#{n} <#{n}>) }.join ?\n
+      colist_lines = (1..21).map {|n| %(<#{n}> #{n}) }.join ?\n
+      pdf = to_pdf <<~END, analyze: true
+      ----
+      #{source_lines}
+      ----
+      #{colist_lines}
+      END
+
+      actual = pdf.lines.select {|it| it.include? '(' }
+      (expect actual).to have_size 2
+      (expect actual).to eql ['21 (21)', '(21) 21']
     end
   end
 

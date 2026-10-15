@@ -1007,16 +1007,17 @@ module Asciidoctor
                 adjusted_font_size = nil
                 bounding_box [bounds.left, cursor], width: label_width, height: label_height do
                   if icons == 'font'
-                    # FIXME: we assume icon is square
-                    icon_size = fit_icon_to_bounds icon_size
+                    icon_name = icon_data[:name]
+                    # NOTE: we assume icon is square; icon_size may be less than icon_height
+                    icon_size, icon_height = fit_icon_to_bounds icon_name, icon_size
                     # NOTE: Prawn's vertical center is not reliable, so calculate it manually
                     if label_valign == :center
                       label_valign = :top
-                      if (vcenter_pos = (label_height - icon_size) * 0.5) > 0
+                      if (vcenter_pos = (label_height - icon_height) * 0.5) > 0
                         move_down vcenter_pos
                       end
                     end
-                    icon icon_data[:name],
+                    icon icon_name,
                       valign: label_valign,
                       align: label_text_align,
                       color: (icon_data[:stroke_color] || font_color),
@@ -2672,7 +2673,7 @@ module Asciidoctor
           else
             glyph = (icon_font_data icon_set).unicode icon_name rescue nil
           end
-          unless glyph || explicit_icon_set || !icon_name.start_with?(*IconSetPrefixes)
+          unless glyph || explicit_icon_set || !(valid_icon_set_prefix? icon_name)
             icon_set, icon_name = icon_name.split '-', 2
             glyph = (icon_font_data icon_set).unicode icon_name rescue nil
           end
@@ -4151,7 +4152,7 @@ module Asciidoctor
       def intrinsic_image_dimensions path, format
         if format == 'svg'
           # NOTE: prawn-svg automatically converts intrinsic width and height to pt
-          img_obj = ::Prawn::SVG::Interface.new (::File.read path, mode: 'r:UTF-8'), self, {}
+          img_obj = ::Prawn::SVG::Interface.new (::File.read path, mode: 'r:UTF-8'), self, enable_web_requests: false
           img_size = img_obj.document.sizing
           { width: img_size.output_width, height: img_size.output_height }
         else
@@ -4885,7 +4886,7 @@ module Asciidoctor
         if (icon_data = @theme[%(admonition_icon_#{key})])
           icon_data = (AdmonitionIcons[key]&.merge icon_data) || icon_data
           if (icon_name = icon_data[:name])
-            unless icon_name.start_with?(*IconSetPrefixes)
+            unless valid_icon_set_prefix? icon_name
               log(:info) { %(#{key} admonition in theme uses icon from deprecated fa icon set; use fas, far, or fab instead) }
               icon_data[:name] = %(fa-#{icon_name}) unless icon_name.start_with? 'fa-'
             end
@@ -5013,7 +5014,7 @@ module Asciidoctor
       end
 
       def conum_glyph number
-        @conum_glyphs[number - 1]
+        @conum_glyphs[number - 1] || %((#{number}))
       end
 
       # Derive a PDF-safe, ASCII-only anchor name from the given value.
@@ -5045,8 +5046,14 @@ module Asciidoctor
 
       # Reduce icon height to fit inside bounds.height. Icons will not render
       # properly if they are larger than the current bounds.height.
-      def fit_icon_to_bounds preferred_size
-        (max_height = bounds.height) < preferred_size ? max_height : preferred_size
+      def fit_icon_to_bounds icon_name, preferred_size
+        icon_size = (max_height = bounds.height) < preferred_size ? max_height : preferred_size
+        icon_set = (make_icon icon_name).set
+        rendered_height = nil
+        font icon_set, size: icon_size do
+          rendered_height = font.height - font.line_gap
+        end
+        [rendered_height > icon_size ? icon_size / rendered_height * icon_size : icon_size, icon_size]
       end
 
       def fit_trim_box page_ = page
@@ -5356,6 +5363,16 @@ module Asciidoctor
 
       def url? str
         (str.include? ':/') && (UrlSniffRx.match? str)
+      end
+
+      def valid_icon_set_prefix? icon_name
+        if !(hyphen_idx = icon_name.index '-') || hyphen_idx > 3 || (icon_set = icon_name.slice 0, hyphen_idx) == 'fa'
+          return false
+        end
+        icon_font_data icon_set unless IconSets.include? icon_set
+        icon_set
+      rescue
+        false
       end
 
       # Calculate the width that is needed to print all the
